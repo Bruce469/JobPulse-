@@ -15,6 +15,24 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "config.yaml"
 
 
+def _load_dotenv(path: Path) -> None:
+    """手动加载 .env（KEY=VALUE 每行；已存在的环境变量不覆盖）。
+
+    避免引入 python-dotenv 依赖；.env 不入 git（.gitignore 已含）。
+    """
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 class Config:
     """配置容器：属性访问 + 环境变量注入 DB 密码"""
 
@@ -32,24 +50,36 @@ class Config:
         return self._data
 
     def database(self) -> dict[str, Any]:
-        """数据库配置，含解析后的密码（环境变量 > 默认值）"""
+        """数据库配置，含解析后的密码（仅从环境变量/.env 读取，不硬编码——需求 7.4）。
+
+        未配置密码时（MySQL 驱动）抛 ValueError 引导设置 DB_PASSWORD。
+        """
         db = dict(self._data["database"])
-        pw_env = db.get("password_env")
-        if pw_env:
-            db["password"] = os.environ.get(pw_env) or db.get("password_default", "")
-        else:
-            db["password"] = db.get("password_default", "")
+        pw_env = db.get("password_env") or "DB_PASSWORD"
+        _load_dotenv(PROJECT_ROOT / ".env")
+        password = os.environ.get(pw_env, "")
+        if not password and db.get("driver") == "mysql":
+            raise ValueError(
+                f"未配置数据库密码：请设置环境变量 {pw_env}（或项目根 .env 文件），"
+                f"或切换 database.driver=sqlite 开发兜底"
+            )
+        db["password"] = password
         return db
 
     def sqlalchemy_url(self) -> str:
-        """SQLAlchemy 连接串：mysql+pymysql://... 或 sqlite:///...（REQ-DB-02）"""
+        """SQLAlchemy 连接串：mysql+pymysql://... 或 sqlite:///...（REQ-DB-02）。
+
+        密码经 URL 编码（含 @:/ 等特殊字符时连接串不破裂）。
+        """
+        from urllib.parse import quote_plus
+
         db = self.database()
         if db.get("driver") == "sqlite":
             path = PROJECT_ROOT / db.get("sqlite_path", "data/jobpulse.db")
             path.parent.mkdir(parents=True, exist_ok=True)
             return f"sqlite:///{path.as_posix()}"
         user = db["user"]
-        password = db.get("password", "")
+        password = quote_plus(db.get("password", ""))
         host = db.get("host", "localhost")
         port = db.get("port", 3306)
         name = db["name"]

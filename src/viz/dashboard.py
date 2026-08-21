@@ -78,10 +78,12 @@ def _echarts_js() -> str:
 def render_html(data: dict) -> str:
     """渲染单 HTML（数据内嵌 + echarts 内嵌）。
 
-    注意：不能使用 str.format()（echarts.min.js 含大量 {} 字面量），
-    改用占位符替换（REQ-VIZ-01）。
+    注意：不能使用 str.format()（echarts.min.js 含大量 {} 字面量），改用占位符替换；
+    内嵌 JSON 转义 < > &（防 </script> 注入 / XSS，安全审查项）。
     """
     payload = json.dumps(data, ensure_ascii=False)
+    payload = (payload.replace("<", "\\u003c").replace(">", "\\u003e")
+               .replace("&", "\\u0026"))
     js = _echarts_js()
     return (_HTML_TEMPLATE
             .replace("__ECHARTS_JS__", js)
