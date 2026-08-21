@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+.venv/
+
+# 中间产物与 checkpoint(需求 7.3 约定不入库)
+data/
+
+# 敏感配置(需求 7.4 约定不入库)
+.env
+
+# 运行日志
+logs/
+*.log
+
+# 临时探测脚本（不入库）
+.tmp_probe/
+
+# Reasonix 工具内部数据（不入库）
+.reasonix/
