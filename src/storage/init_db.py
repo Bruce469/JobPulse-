@@ -56,14 +56,19 @@ def _upsert_stmt(model, rows: list[dict], update_cols: list[str]):
 def upsert_jobs(rows: list[dict], cfg: Config | None = None) -> int:
     """幂等写入 jobs 表：已存在则更新最新状态，不存在则插入（REQ-DB-03）。
 
-    返回受影响行数（MySQL 语义；SQLite 返回 None 时按 len(rows) 计）。
+    分批写入（chunk=40）兼容 SQLite 999 变量上限；返回总行数。
     """
     if not rows:
         return 0
-    stmt = _upsert_stmt(Job, rows, JOB_UPDATE_COLUMNS)
-    with session_scope(cfg) as s:
-        result = s.execute(stmt)
-        return result.rowcount if result.rowcount is not None else len(rows)
+    total = 0
+    CHUNK = 40  # 40 行 × 21 列 = 840 变量 < SQLite 999 上限
+    for i in range(0, len(rows), CHUNK):
+        chunk = rows[i:i + CHUNK]
+        stmt = _upsert_stmt(Job, chunk, JOB_UPDATE_COLUMNS)
+        with session_scope(cfg) as s:
+            s.execute(stmt)
+            total += len(chunk)
+    return total
 
 
 def insert_snapshots(rows: list[dict], cfg: Config | None = None) -> int:
@@ -90,10 +95,13 @@ def insert_snapshots(rows: list[dict], cfg: Config | None = None) -> int:
         stmt = mysql_insert(JobSnapshot).prefix_with("IGNORE")
     else:
         stmt = sqlite_insert(JobSnapshot).on_conflict_do_nothing()
-    with session_scope(cfg) as s:
-        s.execute(stmt, deduped)
-        # executemany + RETURNING 下 rowcount 不可用，返回批次去重后行数（幂等语义以 DB 计数为准）
-        return len(deduped)
+    total = 0
+    CHUNK = 140  # 140 行 × 7 列 = 980 变量 < SQLite 999 上限
+    for i in range(0, len(deduped), CHUNK):
+        with session_scope(cfg) as s:
+            s.execute(stmt, deduped[i:i + CHUNK])
+            total += len(deduped[i:i + CHUNK])
+    return total
 
 
 def mark_invalid(job_ids: Iterable[str], crawl_date: datetime | None = None,

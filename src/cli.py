@@ -64,16 +64,21 @@ def cmd_check_env(cfg) -> int:
     print("=" * 50)
     print(f"Python: {platform.python_version()} ({platform.system()})")
 
-    required = ["pandas", "numpy", "SQLAlchemy", "PyMySQL", "jieba", "matplotlib",
-                "xgboost", "sklearn", "wordcloud", "pytest", "openpyxl", "pyarrow"]
+    required = [
+        ("pandas", "pandas"), ("numpy", "numpy"), ("sqlalchemy", "SQLAlchemy"),
+        ("pymysql", "PyMySQL"), ("jieba", "jieba"), ("matplotlib", "matplotlib"),
+        ("xgboost", "xgboost"), ("sklearn", "scikit-learn"),
+        ("wordcloud", "wordcloud"), ("pytest", "pytest"),
+        ("openpyxl", "openpyxl"), ("pyarrow", "pyarrow"),
+    ]
     missing = []
-    for m in required:
+    for mod, disp in required:
         try:
-            importlib.import_module(m)
-            print(f"  ✔ {m}")
+            importlib.import_module(mod)
+            print(f"  ✔ {disp}")
         except ImportError:
-            missing.append(m)
-            print(f"  ✘ {m} 缺失")
+            missing.append(disp)
+            print(f"  ✘ {disp} 缺失")
     if missing:
         print(f"缺失依赖: {missing}，请执行 pip install -r requirements.txt")
         return 1
