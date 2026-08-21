@@ -4,15 +4,24 @@ import { api } from '../api'
 
 const query = reactive({
   city: '', category: '', education: '', experience: '', job_type: '',
-  keyword: '', page: 1, page_size: 10, sort_by: 'crawl_date', order: 'desc',
+  keyword: '', source: '', page: 1, page_size: 10, sort_by: 'crawl_date', order: 'desc',
 })
-const meta = ref({ cities: [], categories: [], educations: [] })
+const meta = ref({ cities: [], categories: [], educations: [], sources: [] })
 const result = ref({ total: 0, items: [] })
 const loading = ref(false)
 const error = ref('')
 
 const EXPERIENCES = ['不限', '1年以内', '1-3年', '3-5年', '5-10年', '10年以上']
 const JOB_TYPES = ['不限', '社招', '校招', '实习']
+
+// 数据源下拉显示名（值仍为 source id）
+const SOURCE_LABELS = {
+  backup: 'GitHub 数据集',
+  job51: '51job',
+  iguopin: '国聘网',
+  nowcoder: '牛客网',
+}
+const sourceLabel = (s) => SOURCE_LABELS[s] || s
 
 async function load() {
   loading.value = true
@@ -52,6 +61,8 @@ const fmtSalary = (r) => {
 <template>
   <div>
     <div class="toolbar">
+      <select v-model="query.source"><option value="">全部数据源</option>
+        <option v-for="s in meta.sources" :key="s" :value="s">{{ sourceLabel(s) }}</option></select>
       <select v-model="query.city"><option value="">全部城市</option>
         <option v-for="c in meta.cities" :key="c" :value="c">{{ c }}</option></select>
       <select v-model="query.category"><option value="">全部类别</option>

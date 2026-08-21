@@ -23,7 +23,12 @@ from typing import Iterator, Optional
 
 import pandas as pd
 
-from src.etl.clean import clean_city, clean_job_type, classify_category
+from src.etl.clean import (
+    CITY_WHITELIST,
+    clean_city,
+    clean_job_type,
+    classify_category,
+)
 from src.etl.jd_parse import parse_education_from_text, parse_experience_from_text
 from src.etl.salary import parse_salary
 
@@ -32,9 +37,6 @@ logger = logging.getLogger(__name__)
 SOURCE_ID = "backup"
 SOURCE_URL = "https://github.com/Rayair019/Job-posting-data"
 SUPPORTED_EXTS = {".xlsx", ".csv", ".json"}
-
-# 10 城白名单（4.1；其他城市/“其他” → is_valid=0）
-CITY_WHITELIST = {"北京", "上海", "广州", "深圳", "杭州", "成都", "南京", "武汉", "西安", "苏州"}
 
 
 def _parse_industry(other: Optional[str]) -> str:

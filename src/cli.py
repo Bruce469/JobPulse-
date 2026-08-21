@@ -35,8 +35,9 @@ def _setup() -> tuple[argparse.Namespace, object]:
 
     sub.add_parser("check-env", help="环境检查")
     sub.add_parser("init-db", help="建库")
-    p_crawl = sub.add_parser("crawl", help="采集")
-    p_crawl.add_argument("--source", default="backup", choices=["backup", "job51"])
+    p_crawl = sub.add_parser("crawl", help="采集（--source backup/job51/iguopin/nowcoder）")
+    p_crawl.add_argument("--source", default="backup",
+                         choices=["backup", "job51", "iguopin", "nowcoder"])
     p_crawl.add_argument("--date", default=None, help="批次时间 YYYY-MM-DD HH:MM:SS（测试用）")
     sub.add_parser("etl", help="ETL 数据质量报告")
     sub.add_parser("analyze", help="EDA 探索分析")

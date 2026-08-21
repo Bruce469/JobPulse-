@@ -3,12 +3,22 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import * as echarts from 'echarts'
 import { api } from '../api'
 
-const filters = ref({ city: '', category: '', education: '' })
+const filters = ref({ city: '', category: '', education: '', source: '' })
 const summary = ref(null)
 const filtered = ref(null)
 const chartsData = ref(null)
+const sources = ref([])
 const loading = ref(false)
 const error = ref('')
+
+// 数据源下拉显示名（值仍为 source id）
+const SOURCE_LABELS = {
+  backup: 'GitHub 数据集',
+  job51: '51job',
+  iguopin: '国聘网',
+  nowcoder: '牛客网',
+}
+const sourceLabel = (s) => SOURCE_LABELS[s] || s
 
 let charts = {}
 const containerIds = ['c_salary', 'c_city', 'c_skills', 'c_cat', 'c_heat']
@@ -21,6 +31,7 @@ async function load() {
     summary.value = data.summary
     filtered.value = data.filtered
     chartsData.value = data.charts
+    sources.value = data.sources || []
     renderCharts()
   } catch (e) {
     error.value = e.message
@@ -110,6 +121,12 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="filters">
+      <label>数据源
+        <select v-model="filters.source" @change="load">
+          <option value="">全部数据源</option>
+          <option v-for="s in sources" :key="s" :value="s">{{ sourceLabel(s) }}</option>
+        </select>
+      </label>
       <label>城市
         <select v-model="filters.city" @change="load">
           <option value="">全部城市</option>

@@ -39,6 +39,14 @@ crawler:
   retry_backoff: 2.0        # 指数退避基数（秒）
   page_size: 50
   max_pages_per_keyword: 10
+  # 实时数据源（2026-02 实测可用；keywords 复用上方 categories 展开）
+  live_sources:
+    iguopin:                # 国聘网（gp-api 公开接口，国企央企岗位）
+      page_size: 50
+      max_pages: 3
+    nowcoder:               # 牛客网（nowpick 公开接口，校招/实习/社招）
+      page_size: 20
+      max_pages: 5
   # 健康监控告警阈值（REQ-DC-07）
   alert_hit_rate: 0.30      # 整体命中率低于该值告警
   # checkpoint（REQ-DC-04）

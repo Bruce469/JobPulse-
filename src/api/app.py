@@ -51,6 +51,7 @@ def _full_data(cfg: Config) -> dict:
 def _query_jobs(cfg: Config, city: str | None = None, category: str | None = None,
                 education: str | None = None, experience: str | None = None,
                 job_type: str | None = None, keyword: str | None = None,
+                source: str | None = None,
                 page: int = 1, page_size: int = 20,
                 sort_by: str = "crawl_date", order: str = "desc") -> dict:
     """DB 层分页查询（避免全量加载），返回 {total, items}。"""
@@ -70,6 +71,8 @@ def _query_jobs(cfg: Config, city: str | None = None, category: str | None = Non
             stmt = stmt.where(Job.experience_req == experience)
         if job_type:
             stmt = stmt.where(Job.job_type == job_type)
+        if source:
+            stmt = stmt.where(Job.source == source)
         if keyword:
             like = f"%{keyword.strip()}%"
             stmt = stmt.where(or_(
@@ -216,25 +219,30 @@ def create_app(cfg: Config | None = None) -> FastAPI:
         return {"status": "ok", "jobs": jobs, "snapshots": snaps, "db": driver}
 
     @app.get("/api/jobs/summary")
-    def jobs_summary(city: str = "", category: str = "", education: str = ""):
+    def jobs_summary(city: str = "", category: str = "", education: str = "",
+                     source: str = ""):
         data = _full_data(cfg)
         summary = dict(data["summary"])
+        sources = sorted({r.get("src") for r in data["records"] if r.get("src")})
         records = stats_mod.filter_records(data["records"], city or None,
-                                           category or None, education or None)
+                                           category or None, education or None,
+                                           source or None)
         filtered = stats_mod.stats(records)
         charts = stats_mod.build_charts(records, summary["categories"], summary["cities"])
-        return {"summary": summary, "filtered": filtered, "charts": charts}
+        return {"summary": summary, "filtered": filtered, "charts": charts,
+                "sources": sources}
 
     @app.get("/api/jobs")
     def jobs(
         city: str = "", category: str = "", education: str = "",
         experience: str = "", job_type: str = "", keyword: str = "",
+        source: str = "",
         page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
         sort_by: str = "crawl_date", order: str = "desc",
     ):
         res = _query_jobs(cfg, city or None, category or None, education or None,
                           experience or None, job_type or None, keyword or None,
-                          page, page_size, sort_by, order)
+                          source or None, page, page_size, sort_by, order)
         smap = _skills_map(cfg)
         items = [_serialize_job(j, smap) for j in res["items"]]
         total_pages = (res["total"] + page_size - 1) // page_size
@@ -245,7 +253,8 @@ def create_app(cfg: Config | None = None) -> FastAPI:
     def meta():
         """筛选选项（供前端初始化下拉，避免依赖 summary 全量数据）。"""
         data = _full_data(cfg)
-        return data["summary"]
+        sources = sorted({r.get("src") for r in data["records"] if r.get("src")})
+        return {**data["summary"], "sources": sources}
 
     @app.post("/api/model/predict", response_model=PredictResponse)
     def predict(req: PredictRequest):

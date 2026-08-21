@@ -55,6 +55,7 @@ def build_dashboard_data(df: pd.DataFrame, features_df: Optional[pd.DataFrame]) 
             "c": r.city, "g": r.job_category, "e": r.education_req,
             "s": int(r.salary_avg) if pd.notna(r.salary_avg) else None,
             "sk": [str(x) for x in sk] if isinstance(sk, list) else [],
+            "src": getattr(r, "source", ""),
         })
 
     sal = df["salary_avg"].dropna()

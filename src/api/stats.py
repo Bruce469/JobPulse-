@@ -12,8 +12,9 @@ from typing import Any, Iterable
 
 
 def filter_records(records: list[dict], city: str | None = None,
-                   category: str | None = None, education: str | None = None) -> list[dict]:
-    """按 城市 / 岗位类别 / 学历 过滤（None/空串 表示不过滤）。"""
+                   category: str | None = None, education: str | None = None,
+                   source: str | None = None) -> list[dict]:
+    """按 城市 / 岗位类别 / 学历 / 数据源 过滤（None/空串 表示不过滤）。"""
     out = []
     for r in records:
         if city and r["c"] != city:
@@ -21,6 +22,8 @@ def filter_records(records: list[dict], city: str | None = None,
         if category and r["g"] != category:
             continue
         if education and r["e"] != education:
+            continue
+        if source and r.get("src") != source:
             continue
         out.append(r)
     return out
