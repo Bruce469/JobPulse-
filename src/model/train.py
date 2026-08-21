@@ -98,6 +98,20 @@ def plot_feature_importance(model, feature_names: list[str], cfg: Config,
     return str(out)
 
 
+def save_model(model, feat_cols: list[str], cfg: Config) -> str:
+    """导出模型 + 特征列名到 output/model/jobpulse_xgb.joblib（供 API 在线预测）。
+
+    模型以 log 目标训练，预测侧需对输出 exp 还原（见 src/api/app.py _predict）。
+    """
+    import joblib
+
+    out = Path(cfg.raw["paths"]["model_dir"]) / "jobpulse_xgb.joblib"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"model": model, "features": feat_cols}, out)
+    logger.info("模型已导出: %s", out)
+    return str(out)
+
+
 def run_model(cfg: Config, df: pd.DataFrame | None = None,
               features_df: pd.DataFrame | None = None) -> dict:
     """执行完整建模流程，返回评估结果 dict。"""
@@ -142,6 +156,7 @@ def run_model(cfg: Config, df: pd.DataFrame | None = None,
 
     # 特征重要性图
     imp_path = plot_feature_importance(model, feat_cols, cfg)
+    save_model(model, feat_cols, cfg)  # 导出在线预测模型（API /api/model/predict）
 
     result = {
         "meta": meta,

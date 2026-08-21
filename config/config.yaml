@@ -71,11 +71,16 @@ model:
 viz:
   dashboard_output: output/dashboard/jobpulse_dashboard.html
 
+api:
+  host: 127.0.0.1        # REST API 监听地址（前后端分离后端）
+  port: 8000
+
 paths:
   data_dir: data
   output_dir: output
   charts_dir: output/charts
   reports_dir: output/reports
+  model_dir: output/model                      # 在线预测模型导出目录
   features_path: output/analysis/features.parquet   # REQ-NLP-05
   report_path: output/reports/report.md             # REQ-DEL-02
   dq_report_path: output/reports/data_quality_report.md   # REQ-DQ-03

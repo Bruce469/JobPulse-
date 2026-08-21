@@ -44,6 +44,10 @@ def _setup() -> tuple[argparse.Namespace, object]:
     sub.add_parser("model", help="薪资预测建模")
     sub.add_parser("viz", help="生成看板")
     sub.add_parser("report", help="分析报告")
+    p_api = sub.add_parser("api", help="启动 REST API 服务（前后端分离后端）")
+    p_api.add_argument("--host", default=None, help="监听地址（默认 config.api.host）")
+    p_api.add_argument("--port", type=int, default=None, help="端口（默认 config.api.port）")
+    p_api.add_argument("--reload", action="store_true", help="开启变更热加载（uvicorn --reload）")
     sub.add_parser("all", help="一键全流程")
 
     args = parser.parse_args()
@@ -222,7 +226,37 @@ def cmd_all(cfg) -> int:
     return 0
 
 
+def cmd_api(cfg, host: str | None, port: int | None, reload: bool) -> int:
+    """启动 REST API（uvicorn）：python src/cli.py api [--host --port --reload]。"""
+    import importlib.util
+
+    import uvicorn
+
+    # 环境自检：依赖装在 .venv，用系统 Python 跑会缺包（sqlalchemy 等）
+    missing = [m for m in ("sqlalchemy", "pandas", "fastapi", "uvicorn")
+               if importlib.util.find_spec(m) is None]
+    if missing:
+        print("❌ 当前 Python 缺少依赖: " + ", ".join(missing))
+        print("   请使用项目虚拟环境启动（二选一）：")
+        print("   1) .venv\\Scripts\\python src\\cli.py api")
+        print("   2) .venv\\Scripts\\Activate.ps1  然后  python src\\cli.py api")
+        return 1
+
+    api_cfg = cfg.raw.get("api", {})
+    host = host or api_cfg.get("host", "127.0.0.1")
+    port = port or api_cfg.get("port", 8000)
+    print(f"JobPulse API 启动: http://{host}:{port}  (docs: /docs)")
+    print("Ctrl+C 停止。前端开发模式请另开终端: cd web && npm run dev")
+    uvicorn.run("src.api.app:app", host=host, port=port, reload=reload)
+    return 0
+
+
 def main() -> int:
+    # Windows 控制台/管道默认 GBK，R² 等 Unicode 字符会导致 print 抛
+    # UnicodeEncodeError；统一重配置为 UTF-8（errors=replace 兜底）。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args, cfg = _setup()
     setup_logging(cfg.raw["paths"]["logs_dir"])
     os.environ.setdefault("DB_PASSWORD", cfg.database().get("password", ""))
@@ -237,6 +271,7 @@ def main() -> int:
         "model": cmd_model,
         "viz": cmd_viz,
         "report": cmd_report,
+        "api": lambda c: cmd_api(c, args.host, args.port, args.reload),
         "all": cmd_all,
     }
     return handlers[args.cmd](cfg)

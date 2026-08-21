@@ -22,3 +22,7 @@ logs/
 
 # Reasonix 工具内部数据（不入库）
 .reasonix/
+
+# 前端依赖与构建产物（web/dist 由 npm run build 生成，仓库不携带）
+web/node_modules/
+web/dist/

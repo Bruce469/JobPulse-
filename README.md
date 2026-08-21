@@ -19,24 +19,29 @@ JobPulse 是一个个人学习展示项目，打通**获取 → 存储 → 清�
 | 数据分析 | EDA 8 图（城市/大类/行业分布 + 学历/经验/城市/类别薪资对比 + 热力图），6 条量化洞察 |
 | 文本挖掘 | jieba 分词 + 89 个技能词表，技能 Top30（命中岗位占比口径）、城市/类别差异对比、中文词云，产出建模特征 |
 | 薪资建模 | XGBoost 回归（log 目标变换 + 标题/JD 文本特征），测试集 **R² = 0.5144**（≥0.50 达标），MAE 8,733 / RMSE 12,508 |
-| 可视化 | **ECharts 交互看板**：单 HTML 数据内嵌，双击即开，城市/类别/学历筛选联动 |
+| 可视化 | **ECharts 看板**：单 HTML 数据内嵌，双击即开（`src/viz`）+ **前后端分离版**（FastAPI + Vue3，看板/岗位列表/搜索/薪资预测，`src/api` + `web/`） |
 | 工程化 | adapter 可插拔数据源、断点续爬 checkpoint、请求重试退避、采集健康监控、日志、幂等增量、一键链路 |
 
 ## 二、架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ 交互层：ECharts 看板（HTML，数据内嵌） / 分析报告（MD） │
-├─────────────────────────────────────────────────────┤
-│ 分析层：EDA（matplotlib） + 技能图谱（jieba/wordcloud）│
-│         + 薪资预测（XGBoost/scikit-learn）           │
-├─────────────────────────────────────────────────────┤
-│ 数据层：ETL 清洗纯函数 + SQLAlchemy ORM → MySQL      │
-│         （SQLite 开发兜底）                          │
-├─────────────────────────────────────────────────────┤
-│ 采集层：adapter（backup / job51）                    │
-│         重试 + 限速 + UA 池 + 幂等写入 + checkpoint   │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ 交互层：前后端分离 Web（Vue3 + ECharts，web/）                │
+│         / 单 HTML 看板（数据内嵌，双击即开）/ 分析报告（MD）   │
+├─────────────────────────────────────────────────────────────┤
+│ API 层：FastAPI REST（src/api/）                             │
+│         /api/jobs/summary · /api/jobs · /api/meta            │
+│         /api/model/predict · 静态托管 web/dist               │
+├─────────────────────────────────────────────────────────────┤
+│ 分析层：EDA（matplotlib） + 技能图谱（jieba/wordcloud）       │
+│         + 薪资预测（XGBoost/scikit-learn）                   │
+├─────────────────────────────────────────────────────────────┤
+│ 数据层：ETL 清洗纯函数 + SQLAlchemy ORM → MySQL              │
+│         （SQLite 开发兜底）                                  │
+├─────────────────────────────────────────────────────────────┤
+│ 采集层：adapter（backup / job51 / 待接入实时源）             │
+│         重试 + 限速 + UA 池 + 幂等写入 + checkpoint           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## 三、目录结构
@@ -50,15 +55,19 @@ jobpulse/
 │   ├── stopwords.txt         # 停用词
 │   └── userdict.txt          # jieba 自定义词典
 ├── src/
-│   ├── cli.py                # 命令行入口（check-env/init-db/crawl/etl/analyze/nlp/model/viz/report/all）
+│   ├── cli.py                # 命令行入口（check-env/init-db/crawl/etl/analyze/nlp/model/viz/report/api/all）
 │   ├── crawler/              # adapter（backup/job51）+ 反爬容错 + checkpoint + 健康监控
 │   ├── storage/              # ORM models（jobs/job_snapshots）+ 建表 + 幂等写入
 │   ├── etl/                  # 薪资归一化 + 字段清洗 + JD 解析 + 数据质量报告
 │   ├── analysis/             # EDA（8 图 + 洞察）
 │   ├── nlp/                  # 技能匹配 + Top30 + 差异 + 词云 + features.parquet
-│   ├── model/                # 特征工程 + XGBoost 训练评估
+│   ├── model/                # 特征工程 + XGBoost 训练评估 + 模型导出（output/model）
+│   ├── api/                  # FastAPI REST（summary/岗位明细/薪资预测/静态托管）
 │   ├── viz/                  # ECharts 看板生成（单 HTML）
 │   └── scheduler/            # 增量调度（APScheduler 可选）
+├── web/                      # 前端（Vue3 + Vite + ECharts，前后端分离版）
+│   ├── src/views/            # Dashboard 看板 / Jobs 岗位列表 / Predict 薪资预测
+│   └── dist/                 # npm run build 产物（由 FastAPI 静态托管）
 ├── tests/                    # 130+ 项单测/集成测试
 ├── data/                     # 中间产物 + 数据集（.gitignore，不入库）
 ├── output/                   # 图表 / 报告 / 看板 / features.parquet（入库展示）
@@ -108,6 +117,32 @@ python src/cli.py viz                     # 看板
 python src/cli.py report                  # 分析报告
 ```
 
+### 前后端分离模式（FastAPI + Vue3）
+
+```bash
+# 1. 启动后端 API（默认 http://127.0.0.1:8000，Swagger 文档 /docs）
+$env:DB_PASSWORD="你的MySQL密码"
+python src/cli.py api
+
+# 2. 前端开发模式（另开终端，http://localhost:5173，/api 自动代理到后端）
+cd web
+npm install
+npm run dev
+
+# 3. 生产构建（产物 web/dist 由后端静态托管，单端口访问 http://127.0.0.1:8000）
+cd web && npm run build
+```
+
+REST 接口一览：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/health` | 健康检查（jobs/snapshots 计数 + DB 驱动） |
+| `GET /api/jobs/summary` | 看板聚合（summary + 5 图表模块，支持城市/类别/学历筛选） |
+| `GET /api/jobs` | 岗位明细分页（筛选 + 关键词搜索 + 排序） |
+| `GET /api/meta` | 筛选选项（城市/类别/学历） |
+| `POST /api/model/predict` | 薪资在线预测（需先运行 `python src/cli.py model` 导出模型） |
+
 ### 增量与调度
 
 ```bash
@@ -156,6 +191,7 @@ python -m src.scheduler.run --interval-hours 24   # APScheduler 每 24h 定时
 ## 八、Roadmap / 已知限制
 
 - [x] 一期：数据集全链路（采集-存储-清洗-分析-建模-看板）
+- [x] 二期（P0）：前后端分离（FastAPI REST + Vue3 Web，看板/岗位列表/搜索/薪资预测）
 - [ ] 二期（P1）：接入可用的公开 API 数据源（adapter 已预留）
 - [ ] 时间趋势（P2）：积累 ≥2 个采集批次后，基于 job_snapshots 产出趋势图
 - 南京(190)/西安(143)/苏州(110) 单城样本 <200，属数据集覆盖限制，已在报告中声明
